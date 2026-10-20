@@ -10,6 +10,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from cogs import _style as style
+from cogs import _giveaway_store as giveaways
 
 log = logging.getLogger("bot.ticketpanel")
 
@@ -25,6 +26,9 @@ CATEGORIES = [
     {"key": "giveaway_claim", "label": "Giveaway Claim", "emoji": "🎁", "description": "Claim a giveaway prize", "env": "TICKET_CATEGORY_GIVEAWAY_CLAIM_ID"},
 ]
 CATEGORY_BY_KEY = {c["key"]: c for c in CATEGORIES}
+
+# These categories ask the opener for details (what, how many, IGN) before the ticket opens.
+SPAWNER_KEYS = {"spawner_sell", "spawner_buy"}
 
 
 def _env_id(name: str) -> int:
@@ -102,6 +106,55 @@ class CloseView(discord.ui.View):
             log.exception("Could not delete ticket channel %s", interaction.channel_id)
 
 
+class SpawnerModal(discord.ui.Modal):
+    """Asks the opener for the details of a spawner sell or buy ticket."""
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+        buying = key == "spawner_buy"
+        super().__init__(title="Spawner Buy Ticket" if buying else "Spawner Sell Ticket")
+        self.spawner = discord.ui.TextInput(
+            label="What are you buying?" if buying else "What are you selling?",
+            placeholder="e.g. Skelly",
+            max_length=50,
+        )
+        self.amount = discord.ui.TextInput(label="How many?", placeholder="e.g. 120", max_length=10)
+        self.ign = discord.ui.TextInput(label="Your IGN (in-game name)", placeholder="e.g. Steve", max_length=32)
+        self.add_item(self.spawner)
+        self.add_item(self.amount)
+        self.add_item(self.ign)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        details = {
+            "spawner": self.spawner.value.strip(),
+            "amount": self.amount.value.strip(),
+            "ign": self.ign.value.strip(),
+        }
+        await _create_ticket(interaction, self.key, details)
+
+
+class GiveawayClaimModal(discord.ui.Modal):
+    """Asks for the prize and the IGN before a giveaway claim ticket opens."""
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(title="Giveaway Claim Ticket")
+        self.won = discord.ui.TextInput(
+            label="What did you win?",
+            placeholder="e.g. 5 stack of spawner",
+            max_length=50,
+        )
+        self.ign = discord.ui.TextInput(label="Your IGN (in-game name)", placeholder="e.g. Steve", max_length=32)
+        self.add_item(self.won)
+        self.add_item(self.ign)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        details = {"amount": self.won.value.strip(), "ign": self.ign.value.strip()}
+        await _create_ticket(interaction, self.key, details)
+
+
 async def _open_ticket(interaction: discord.Interaction, key: str) -> None:
     category = CATEGORY_BY_KEY.get(key)
     if category is None:
@@ -121,7 +174,22 @@ async def _open_ticket(interaction: discord.Interaction, key: str) -> None:
             return
         _remove(existing["channel_id"])  # Channel was deleted by hand, clean up the record
 
+    if key == "giveaway_claim":
+        await interaction.response.send_modal(GiveawayClaimModal(key))
+        return
+    if key in SPAWNER_KEYS:
+        # Ask for the details first. The ticket is created when the form is submitted.
+        await interaction.response.send_modal(SpawnerModal(key))
+        return
+
     await interaction.response.defer(ephemeral=True)
+    await _create_ticket(interaction, key, None)
+
+
+async def _create_ticket(interaction: discord.Interaction, key: str, details: dict | None) -> None:
+    category = CATEGORY_BY_KEY[key]
+    guild = interaction.guild
+    member = interaction.user
 
     overwrites = {
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -172,14 +240,33 @@ async def _open_ticket(interaction: discord.Interaction, key: str) -> None:
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
 
-    embed = discord.Embed(
-        title=f"{category['emoji']} {category['label']}",
-        description=(
-            f"Hi {member.mention}! Please describe your request in as much detail as you can. "
-            "A staff member will be with you soon."
-        ),
-        color=style.INFO,
-    )
+    if details is None:
+        embed = discord.Embed(
+            title=f"{category['emoji']} {category['label']}",
+            description=(
+                f"Hi {member.mention}! Please describe your request in as much detail as you can. "
+                "A staff member will be with you soon."
+            ),
+            color=style.INFO,
+        )
+    elif key == "giveaway_claim":
+        # Checks the last giveaways automatically. Confirmed or Under Review, depending on the result.
+        win = giveaways.find_recent_win(member.id)
+        embed = giveaways.claim_embed(member.id, details["ign"], details["amount"], win)
+    else:
+        buying = key == "spawner_buy"
+        embed = discord.Embed(title=f"{category['label']} Ticket", color=style.INFO)
+        embed.add_field(name="Opened by", value=member.mention, inline=False)
+        embed.add_field(
+            name="What are you buying" if buying else "What are you selling",
+            value=details["spawner"],
+            inline=True,
+        )
+        embed.add_field(name="How many", value=details["amount"], inline=True)
+        embed.add_field(name="IGN", value=details["ign"], inline=True)
+        embed.add_field(name="Reminder", value="Make sure your TPA is turned on.", inline=False)
+        embed.set_footer(text="A staff member will be with you soon.")
+
     await channel.send(content=member.mention, embed=embed, view=CloseView())
     await interaction.followup.send(f"Your ticket is ready: {channel.mention}", ephemeral=True)
 

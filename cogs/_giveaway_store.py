@@ -17,6 +17,8 @@ from pathlib import Path
 
 import discord
 
+from cogs import _style as style
+
 log = logging.getLogger("bot.giveaway_store")
 
 DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "giveaways.json"
