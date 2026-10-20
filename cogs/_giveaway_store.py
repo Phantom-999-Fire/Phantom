@@ -90,31 +90,36 @@ def claim_embed(user_id: int, ign: str, amount: str, win: dict | None) -> discor
     """
     mention = f"<@{user_id}>"
     if win is not None:
+        won_on = int(datetime.fromisoformat(win["created_at"]).timestamp())
+        link = (
+            f"https://discord.com/channels/{win['guild_id']}/"
+            f"{win['channel_id']}/{win['message_id']}"
+        )
         embed = discord.Embed(
-            title="Giveaway Win Confirmed!",
+            title="Giveaway Win Confirmed",
             description=(
-                f"The user {mention} (IGN: `{ign}`) has won a recent giveaway."
+                f"**Opened By:** {mention}\n\n"
+                f"**Prize:** {win['prize']}\n"
+                f"**IGN:** {ign}\n"
+                f"**Giveaway:** [Open giveaway]({link})\n"
+                f"**Date:** <t:{won_on}:D>\n\n"
+                "**Result**\n"
+                f"Verified. The user won a giveaway in the last {RECENT_LIMIT}."
             ),
             color=style.SUCCESS,
-        )
-        embed.add_field(name="Amount to Pay", value=win["prize"])
-        embed.add_field(name="IGN", value=ign)
-        embed.add_field(
-            name="Won giveaway",
-            value=f"<t:{int(datetime.fromisoformat(win['created_at']).timestamp())}:D>",
-            inline=False,
         )
         embed.set_footer(text="Verification successful.")
     else:
         embed = discord.Embed(
             title="Under Review",
             description=(
-                f"The user {mention} (IGN: `{ign}`) has not won any of the last "
-                f"{RECENT_LIMIT} giveaways. This claim is under review."
+                f"**Opened By:** {mention}\n\n"
+                f"**Claimed:** {amount}\n"
+                f"**IGN:** {ign}\n\n"
+                "**Result**\n"
+                f"No win found in the last {RECENT_LIMIT} giveaways. A staff member will review this."
             ),
             color=style.WARNING,
         )
-        embed.add_field(name="Amount to Pay", value=amount)
-        embed.add_field(name="IGN", value=ign)
         embed.set_footer(text="Verification pending.")
     return embed

@@ -255,19 +255,26 @@ async def _create_ticket(interaction: discord.Interaction, key: str, details: di
         embed = giveaways.claim_embed(member.id, details["ign"], details["amount"], win)
     else:
         buying = key == "spawner_buy"
-        embed = discord.Embed(title=f"{category['label']} Ticket", color=style.INFO)
-        embed.add_field(name="Opened by", value=member.mention, inline=False)
-        embed.add_field(
-            name="What are you buying" if buying else "What are you selling",
-            value=details["spawner"],
-            inline=True,
+        what = "What are you buying" if buying else "What are you selling"
+        embed = discord.Embed(
+            title=f"{category['label']} Ticket",
+            description=(
+                f"**Opened By:** {member.mention}\n\n"
+                f"**{what}:** {details['spawner']}\n"
+                f"**How many:** {details['amount']}\n"
+                f"**IGN:** {details['ign']}\n\n"
+                "**Reminder**\n"
+                "Make sure to turn your TPA's on!"
+            ),
+            color=style.INFO,
         )
-        embed.add_field(name="How many", value=details["amount"], inline=True)
-        embed.add_field(name="IGN", value=details["ign"], inline=True)
-        embed.add_field(name="Reminder", value="Make sure your TPA is turned on.", inline=False)
         embed.set_footer(text="A staff member will be with you soon.")
 
-    await channel.send(content=member.mention, embed=embed, view=CloseView())
+    await channel.send(
+        content=f"{member.mention}, your ticket has been created!",
+        embed=embed,
+        view=CloseView(),
+    )
     await interaction.followup.send(f"Your ticket is ready: {channel.mention}", ephemeral=True)
 
 
