@@ -83,6 +83,29 @@ def _remove(channel_id: int) -> None:
     _save([item for item in _load() if item["channel_id"] != channel_id])
 
 
+def _set_field(channel_id: int, **fields) -> None:
+    items = _load()
+    for item in items:
+        if item["channel_id"] == channel_id:
+            item.update(fields)
+    _save(items)
+
+
+def _is_staff(member: discord.Member) -> bool:
+    return member.guild_permissions.manage_channels or bool(
+        SUPPORT_ROLE_ID and any(role.id == SUPPORT_ROLE_ID for role in member.roles)
+    )
+
+
+def _can_answer_close(interaction: discord.Interaction, ticket: dict) -> bool:
+    """The person who asked for the close cannot answer it. The other side (creator or staff) can."""
+    user = interaction.user
+    requested_by = ticket.get("close_request_by")
+    if requested_by is not None and user.id == requested_by:
+        return False
+    return user.id == ticket["user_id"] or _is_staff(user)
+
+
 # ---------- buttons and menus ----------
 
 class CloseView(discord.ui.View):
@@ -384,9 +407,9 @@ class CloseRequestView(discord.ui.View):
         if ticket is None:
             await interaction.response.send_message("This is not an open ticket.", ephemeral=True)
             return
-        if interaction.user.id != ticket["user_id"]:
+        if not _can_answer_close(interaction, ticket):
             await interaction.response.send_message(
-                "Only the ticket creator can answer this request.", ephemeral=True
+                "Only the other side of this ticket can answer this request.", ephemeral=True
             )
             return
 
@@ -408,9 +431,9 @@ class CloseRequestView(discord.ui.View):
         if ticket is None:
             await interaction.response.send_message("This is not an open ticket.", ephemeral=True)
             return
-        if interaction.user.id != ticket["user_id"]:
+        if not _can_answer_close(interaction, ticket):
             await interaction.response.send_message(
-                "Only the ticket creator can answer this request.", ephemeral=True
+                "Only the other side of this ticket can answer this request.", ephemeral=True
             )
             return
 
@@ -527,29 +550,71 @@ class TicketPanel(commands.Cog):
             return
 
         member = interaction.user
-        is_staff = member.guild_permissions.manage_channels or (
-            SUPPORT_ROLE_ID and any(role.id == SUPPORT_ROLE_ID for role in member.roles)
-        )
-        if not is_staff:
+        is_owner = member.id == ticket["user_id"]
+        if not (is_owner or _is_staff(member)):
             await interaction.response.send_message(
-                "Only staff can request that a ticket is closed.", ephemeral=True
+                "Only the ticket owner or staff can request a close.", ephemeral=True
             )
             return
 
-        embed = discord.Embed(
-            title="Close request",
-            description=(
+        _set_field(interaction.channel_id, close_request_by=member.id)
+        if is_owner:
+            # The creator asks: staff decide.
+            description = (
+                f"{member.mention} would like to close this ticket.\n"
+                "Staff, please accept or decline below."
+            )
+            content = f"<@&{SUPPORT_ROLE_ID}>" if SUPPORT_ROLE_ID else None
+        else:
+            # Staff ask: the creator decides.
+            description = (
                 f"{member.mention} would like to close this ticket.\n"
                 f"<@{ticket['user_id']}>, please accept or decline below."
-            ),
-            color=style.WARNING,
-        )
-        await interaction.channel.send(
-            content=f"<@{ticket['user_id']}>",
-            embed=embed,
-            view=CloseRequestView(),
-        )
+            )
+            content = f"<@{ticket['user_id']}>"
+
+        embed = discord.Embed(title="Close request", description=description, color=style.WARNING)
+        await interaction.channel.send(content=content, embed=embed, view=CloseRequestView())
         await interaction.response.send_message("Close request sent.", ephemeral=True)
+
+    @app_commands.command(name="rename", description="Renames the current ticket.")
+    @app_commands.describe(name="The new name, e.g. farm-help-steve")
+    @app_commands.guild_only()
+    async def rename(self, interaction: discord.Interaction, name: app_commands.Range[str, 1, 60]) -> None:
+        ticket = _by_channel(interaction.channel_id)
+        if ticket is None:
+            await interaction.response.send_message(
+                "This command only works inside a ticket.", ephemeral=True
+            )
+            return
+
+        member = interaction.user
+        if not (member.id == ticket["user_id"] or _is_staff(member)):
+            await interaction.response.send_message(
+                "Only the ticket owner or staff can rename this ticket.", ephemeral=True
+            )
+            return
+
+        # Discord channel names: lowercase, no spaces, only letters, numbers and dashes.
+        new_name = re.sub(r"[^a-z0-9-]", "-", name.lower().replace(" ", "-"))
+        new_name = re.sub(r"-+", "-", new_name).strip("-")[:90]
+        if not new_name:
+            await interaction.response.send_message(
+                "Please use letters or numbers in the name.", ephemeral=True
+            )
+            return
+
+        try:
+            await interaction.channel.edit(name=new_name, reason=f"Renamed by {member}")
+        except discord.HTTPException:
+            log.exception("Could not rename ticket channel %s", interaction.channel_id)
+            await interaction.response.send_message(
+                "I could not rename this ticket. Discord allows only a few renames per 10 minutes, so try again later.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(f"Ticket renamed to **{new_name}**.")
 
     @app_commands.command(name="close", description="Closes the current ticket.")
     @app_commands.guild_only()
