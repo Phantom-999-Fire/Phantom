@@ -155,6 +155,34 @@ class GiveawayClaimModal(discord.ui.Modal):
         await _create_ticket(interaction, self.key, details)
 
 
+# Each support topic gets its own Discord category and channel prefix.
+SUPPORT_TOPIC_ENV = {
+    "Farm support": "TICKET_CATEGORY_FARM_SUPPORT_ID",
+    "General": "TICKET_CATEGORY_GENERAL_SUPPORT_ID",
+}
+SUPPORT_TOPIC_PREFIX = {"Farm support": "farm-support", "General": "general-support"}
+
+
+class SupportProblemModal(discord.ui.Modal):
+    """Asks the problem in a panel before the support ticket opens."""
+
+    def __init__(self, topic: str) -> None:
+        self.topic = topic
+        super().__init__(title=f"{topic} ticket")
+        self.problem = discord.ui.TextInput(
+            label="Describe your problem",
+            style=discord.TextStyle.paragraph,
+            placeholder="Tell us what you need help with",
+            max_length=1000,
+        )
+        self.add_item(self.problem)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        details = {"topic": self.topic, "problem": self.problem.value.strip()}
+        await _create_ticket(interaction, "support", details)
+
+
 class SupportTypeView(discord.ui.View):
     """Asks what kind of support is needed. Only shown to the person who picked Support."""
 
@@ -163,15 +191,11 @@ class SupportTypeView(discord.ui.View):
 
     @discord.ui.button(label="Farm support", style=discord.ButtonStyle.primary, emoji="🌾")
     async def farm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        self.stop()
-        await interaction.response.defer(ephemeral=True)
-        await _create_ticket(interaction, "support", {"topic": "Farm support"})
+        await interaction.response.send_modal(SupportProblemModal("Farm support"))
 
     @discord.ui.button(label="General", style=discord.ButtonStyle.secondary, emoji="💬")
     async def general(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        self.stop()
-        await interaction.response.defer(ephemeral=True)
-        await _create_ticket(interaction, "support", {"topic": "General"})
+        await interaction.response.send_modal(SupportProblemModal("General"))
 
 
 async def _open_ticket(interaction: discord.Interaction, key: str) -> None:
@@ -233,7 +257,10 @@ async def _create_ticket(interaction: discord.Interaction, key: str, details: di
         )
 
     # Each ticket type has its own Discord category. Falls back to TICKET_CATEGORY_ID if not set.
-    category_id = _env_id(category["env"]) or TICKET_CATEGORY_ID
+    env_name = category["env"]
+    if key == "support" and details and details.get("topic") in SUPPORT_TOPIC_ENV:
+        env_name = SUPPORT_TOPIC_ENV[details["topic"]]
+    category_id = _env_id(env_name) or _env_id(category["env"]) or TICKET_CATEGORY_ID
     parent = guild.get_channel(category_id) if category_id else None
     if not isinstance(parent, discord.CategoryChannel):
         log.warning(
@@ -243,9 +270,12 @@ async def _create_ticket(interaction: discord.Interaction, key: str, details: di
         parent = None
 
     base = re.sub(r"[^a-z0-9-]", "-", member.name.lower()).strip("-")[:40] or "user"
+    prefix = key
+    if key == "support" and details:
+        prefix = SUPPORT_TOPIC_PREFIX.get(details.get("topic"), key)
     try:
         channel = await guild.create_text_channel(
-            f"{key}-{base}",
+            f"{prefix}-{base}",
             overwrites=overwrites,
             category=parent,
             reason=f"Ticket opened by {member}",
@@ -283,9 +313,8 @@ async def _create_ticket(interaction: discord.Interaction, key: str, details: di
             title="Support Ticket",
             description=(
                 f"**Opened By:** {member.mention}\n\n"
-                f"**Topic:** {details['topic']}\n\n"
-                "**Next step**\n"
-                "Describe your request in as much detail as you can. "
+                f"**Topic:** {details['topic']}\n"
+                f"**Problem:** {details['problem']}\n\n"
                 "A staff member will be with you soon."
             ),
             color=style.INFO,
