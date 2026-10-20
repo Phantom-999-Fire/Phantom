@@ -13,7 +13,6 @@ from cogs import _giveaway_store as store
 
 log = logging.getLogger("bot.giveaway")
 
-EMOJI = "🎉"
 UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
 DURATION_RE = re.compile(r"^(\d+)([smhd])$", re.IGNORECASE)
 MAX_SECONDS = 30 * 86400  # 30 days
@@ -30,14 +29,63 @@ def parse_duration(text: str) -> int | None:
     return seconds
 
 
+def active_embed(entry: dict) -> discord.Embed:
+    """Embed for a running giveaway."""
+    ends_at = datetime.fromisoformat(entry["ends_at"])
+    embed = discord.Embed(
+        title=entry["prize"].upper(),
+        description="Press **Join Giveaway** below to enter.",
+        color=style.INFO,
+    )
+    embed.add_field(name="Ends", value=discord.utils.format_dt(ends_at, "R"), inline=True)
+    embed.add_field(name="Winners", value=str(entry["winners_count"]), inline=True)
+    embed.add_field(name="Entries", value=str(len(entry.get("entrants", []))), inline=True)
+    embed.add_field(name="Hosted by", value=f"<@{entry['host_id']}>", inline=False)
+    return embed
+
+
+class JoinView(discord.ui.View):
+    """Button under each giveaway. Registered once at startup, so it keeps working after a restart."""
+
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="Join Giveaway",
+        style=discord.ButtonStyle.primary,
+        emoji="🎉",
+        custom_id="giveaway:join",
+    )
+    async def join(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        entry = store.get(interaction.message.id)
+        if entry is None or entry["status"] != "active":
+            await interaction.response.send_message("This giveaway has ended.", ephemeral=True)
+            return
+
+        entrants = entry.get("entrants", [])
+        if interaction.user.id in entrants:
+            await interaction.response.send_message("You already joined this giveaway.", ephemeral=True)
+            return
+
+        entrants.append(interaction.user.id)
+        store.update(interaction.message.id, entrants=entrants)
+        entry["entrants"] = entrants
+
+        await interaction.response.edit_message(embed=active_embed(entry))
+        await interaction.followup.send("You joined the giveaway. Good luck!", ephemeral=True)
+
+
 class Giveaway(commands.Cog):
-    """Giveaways with a timer, automatic winner selection and history."""
+    """Giveaways with a join button, automatic winner selection and history."""
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.tasks: dict[int, asyncio.Task] = {}  # message_id -> task
 
     async def cog_load(self) -> None:
+        # Buttons of older giveaways keep working after a restart.
+        self.bot.add_view(JoinView())
+
         # Restore giveaways that were still running when the bot last stopped.
         now = datetime.now(timezone.utc)
         restored = store.active()
@@ -82,22 +130,8 @@ class Giveaway(commands.Cog):
 
         now = datetime.now(timezone.utc)
         ends_at = now + timedelta(seconds=seconds)
-        embed = discord.Embed(
-            title=prize.upper(),
-            description=f"React with {EMOJI} to enter!",
-            color=style.INFO,
-        )
-        embed.add_field(name="Ends", value=discord.utils.format_dt(ends_at, "R"), inline=True)
-        embed.add_field(name="Winners", value=str(winners), inline=True)
-        embed.add_field(name="Hosted by", value=interaction.user.mention, inline=True)
-
-        await interaction.response.send_message(embed=embed)
-        message = await interaction.original_response()
-        await message.add_reaction(EMOJI)
-
-        store.add({
-            "message_id": message.id,
-            "channel_id": message.channel.id,
+        entry = {
+            "channel_id": interaction.channel_id,
             "guild_id": interaction.guild_id,
             "host_id": interaction.user.id,
             "prize": prize,
@@ -105,8 +139,16 @@ class Giveaway(commands.Cog):
             "created_at": now.isoformat(),
             "ends_at": ends_at.isoformat(),
             "status": "active",
+            "entrants": [],
             "winner_ids": [],
-        })
+        }
+
+        await interaction.response.send_message(embed=active_embed(entry), view=JoinView())
+        message = await interaction.original_response()
+
+        entry["message_id"] = message.id
+        entry["channel_id"] = message.channel.id
+        store.add(entry)
         self._schedule(message.id, seconds)
 
     async def _finish(self, message_id: int, seconds: float) -> None:
@@ -117,17 +159,14 @@ class Giveaway(commands.Cog):
             if entry is None or entry["status"] != "active":
                 return
 
+            entrants = entry.get("entrants", [])
+            picked = random.sample(entrants, min(entry["winners_count"], len(entrants)))
+            store.update(message_id, status="ended", winner_ids=picked)
+
             channel = self.bot.get_channel(entry["channel_id"]) or await self.bot.fetch_channel(
                 entry["channel_id"]
             )
             message = await channel.fetch_message(message_id)
-            reaction = discord.utils.get(message.reactions, emoji=EMOJI)
-            entrants = []
-            if reaction is not None:
-                entrants = [user async for user in reaction.users() if not user.bot]
-
-            picked = random.sample(entrants, min(entry["winners_count"], len(entrants)))
-            store.update(message_id, status="ended", winner_ids=[user.id for user in picked])
 
             now = datetime.now(timezone.utc)
             ended = discord.Embed(
@@ -144,16 +183,14 @@ class Giveaway(commands.Cog):
             ended.add_field(name="Entries", value=str(len(entrants)), inline=True)
             ended.add_field(
                 name="Winners",
-                value=", ".join(user.mention for user in picked) if picked else "Nobody entered",
+                value=", ".join(f"<@{user_id}>" for user_id in picked) if picked else "Nobody entered",
                 inline=False,
             )
-            await message.edit(embed=ended)
+            await message.edit(embed=ended, view=None)
 
             if picked:
-                mentions = ", ".join(user.mention for user in picked)
-                await channel.send(
-                    f"Congratulations {mentions}! You won **{entry['prize']}**!"
-                )
+                mentions = ", ".join(f"<@{user_id}>" for user_id in picked)
+                await channel.send(f"Congratulations {mentions}! You won **{entry['prize']}**!")
             else:
                 await channel.send(f"Nobody entered the giveaway for **{entry['prize']}**.")
         except asyncio.CancelledError:
