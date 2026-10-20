@@ -281,19 +281,25 @@ class TicketPanel(commands.Cog):
     async def ticketpanel(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(
             title="Ticket Rules",
-            description="Need help? Choose a category below and a private ticket will be opened for you.",
+            description="Choose a category below to open a private ticket.",
             color=style.INFO,
+        )
+        embed.add_field(
+            name="Before you open a ticket",
+            value=(
+                "Check `#spawner-prices` and `#faq` first.\n"
+                "Ask your question clearly and right away.\n"
+                "Spawner sales only happen on certain occasions. If it is not announced, don't ask."
+            ),
+            inline=False,
         )
         embed.add_field(
             name="Rules",
             value=(
-                "• No troll tickets or unnecessary pings to staff.\n"
-                "• Ask your question clearly and right away.\n"
-                "• Check <#1373579452998746155> and <#1373206610780098662> before opening a ticket.\n"
-                "• Tickets inactive for 1+ days will be closed.\n"
-                "• Spawner sales only happen on certain occasions. If it is not announced, don't ask.\n"
-                "• Fake giveaway claims or trolling will result in a timeout.\n"
-                "• Staff will **never** DM you. All responses stay in the ticket."
+                "No troll tickets or unnecessary pings to staff.\n"
+                "Tickets inactive for 1+ days will be closed.\n"
+                "Fake giveaway claims or trolling will result in a timeout.\n"
+                "Staff will never DM you. All responses stay in the ticket."
             ),
             inline=False,
         )
