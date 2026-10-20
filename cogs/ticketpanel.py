@@ -155,6 +155,25 @@ class GiveawayClaimModal(discord.ui.Modal):
         await _create_ticket(interaction, self.key, details)
 
 
+class SupportTypeView(discord.ui.View):
+    """Asks what kind of support is needed. Only shown to the person who picked Support."""
+
+    def __init__(self) -> None:
+        super().__init__(timeout=180)
+
+    @discord.ui.button(label="Farm support", style=discord.ButtonStyle.primary, emoji="🌾")
+    async def farm(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.stop()
+        await interaction.response.defer(ephemeral=True)
+        await _create_ticket(interaction, "support", {"topic": "Farm support"})
+
+    @discord.ui.button(label="General", style=discord.ButtonStyle.secondary, emoji="💬")
+    async def general(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        self.stop()
+        await interaction.response.defer(ephemeral=True)
+        await _create_ticket(interaction, "support", {"topic": "General"})
+
+
 async def _open_ticket(interaction: discord.Interaction, key: str) -> None:
     category = CATEGORY_BY_KEY.get(key)
     if category is None:
@@ -174,6 +193,12 @@ async def _open_ticket(interaction: discord.Interaction, key: str) -> None:
             return
         _remove(existing["channel_id"])  # Channel was deleted by hand, clean up the record
 
+    if key == "support":
+        # Ask which kind of support is needed before the ticket opens.
+        await interaction.response.send_message(
+            "What do you need help with?", view=SupportTypeView(), ephemeral=True
+        )
+        return
     if key == "giveaway_claim":
         await interaction.response.send_modal(GiveawayClaimModal(key))
         return
@@ -253,6 +278,18 @@ async def _create_ticket(interaction: discord.Interaction, key: str, details: di
         # Checks the last giveaways automatically. Confirmed or Under Review, depending on the result.
         win = giveaways.find_recent_win(member.id)
         embed = giveaways.claim_embed(member.id, details["ign"], details["amount"], win)
+    elif key == "support":
+        embed = discord.Embed(
+            title="Support Ticket",
+            description=(
+                f"**Opened By:** {member.mention}\n\n"
+                f"**Topic:** {details['topic']}\n\n"
+                "**Next step**\n"
+                "Describe your request in as much detail as you can. "
+                "A staff member will be with you soon."
+            ),
+            color=style.INFO,
+        )
     else:
         buying = key == "spawner_buy"
         what = "What are you buying" if buying else "What are you selling"
