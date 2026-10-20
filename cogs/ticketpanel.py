@@ -143,6 +143,10 @@ async def _open_ticket(interaction: discord.Interaction, key: str) -> None:
     category_id = _env_id(category["env"]) or TICKET_CATEGORY_ID
     parent = guild.get_channel(category_id) if category_id else None
     if not isinstance(parent, discord.CategoryChannel):
+        log.warning(
+            "Category for '%s' not found. Check %s in .env (it must be a category ID, not a channel ID).",
+            category["label"], category["env"],
+        )
         parent = None
 
     base = re.sub(r"[^a-z0-9-]", "-", member.name.lower()).strip("-")[:40] or "user"
@@ -276,9 +280,22 @@ class TicketPanel(commands.Cog):
     @app_commands.checks.has_permissions(manage_channels=True)
     async def ticketpanel(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(
-            title="Support Tickets",
+            title="Ticket Rules",
             description="Need help? Choose a category below and a private ticket will be opened for you.",
             color=style.INFO,
+        )
+        embed.add_field(
+            name="Rules",
+            value=(
+                "• No troll tickets or unnecessary pings to staff.\n"
+                "• Ask your question clearly and right away.\n"
+                "• Check <#1373579452998746155> and <#1373206610780098662> before opening a ticket.\n"
+                "• Tickets inactive for 1+ days will be closed.\n"
+                "• Spawner sales only happen on certain occasions. If it is not announced, don't ask.\n"
+                "• Fake giveaway claims or trolling will result in a timeout.\n"
+                "• Staff will **never** DM you. All responses stay in the ticket."
+            ),
+            inline=False,
         )
         await interaction.channel.send(embed=embed, view=PanelView())
         await interaction.response.send_message("Ticket panel posted.", ephemeral=True)

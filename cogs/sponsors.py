@@ -154,16 +154,16 @@ class Sponsors(commands.Cog):
             await interaction.response.send_message("No sponsors yet.")
             return
 
-        lines = []
+        embed = discord.Embed(title="Sponsor Leaderboard", color=style.INFO)
         for position, (user_id, total) in enumerate(ranking, start=1):
-            prefix = MEDALS[position - 1] if position <= len(MEDALS) else f"**{position}.**"
-            lines.append(f"{prefix} <@{user_id}> – **{format_amount(total)}**")
-
-        embed = discord.Embed(
-            title="Sponsor Leaderboard",
-            description="\n".join(lines),
-            color=style.INFO,
-        )
+            member = interaction.guild.get_member(user_id)
+            name = member.display_name if member else f"User {user_id}"
+            embed.add_field(
+                name=f"#{position} · {name}",
+                value=f"**{format_amount(total).upper()}** · <@{user_id}>",
+                inline=False,
+            )
+        embed.set_footer(text=f"Top {len(ranking)} sponsors")
         await interaction.response.send_message(embed=embed)
 
 

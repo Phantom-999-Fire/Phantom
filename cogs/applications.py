@@ -331,11 +331,22 @@ class Applications(commands.Cog):
     async def applypanel(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(
             title="General Support – Apply",
-            description=(
-                "Want to join the General Support Team? Press the button below.\n"
-                "The application has 13 questions and takes a few minutes."
-            ),
+            description="Want to join the General Support Team? Press the button below.",
             color=style.INFO,
+        )
+        embed.add_field(
+            name="Requirements",
+            value=(
+                "• Must be at least 14 years old\n"
+                "• Know how farms work\n"
+                "• Be active"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="Process",
+            value="The application has 13 questions and takes a few minutes.",
+            inline=False,
         )
         await interaction.channel.send(embed=embed, view=ApplyPanelView())
         await interaction.response.send_message("Application panel posted.", ephemeral=True)
