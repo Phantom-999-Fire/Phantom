@@ -166,6 +166,25 @@ class SpawnerModal(discord.ui.Modal):
         await _create_ticket(interaction, self.key, details)
 
 
+class GiveawaySponsorModal(discord.ui.Modal):
+    """Asks what the opener wants to sponsor before the ticket opens."""
+
+    def __init__(self, key: str) -> None:
+        self.key = key
+        super().__init__(title="Giveaway Sponsor Ticket")
+        self.sponsor = discord.ui.TextInput(
+            label="What do you want to sponsor?",
+            placeholder="e.g. 50 stack of spawner or 100M",
+            max_length=100,
+        )
+        self.add_item(self.sponsor)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+        details = {"sponsor": self.sponsor.value.strip()}
+        await _create_ticket(interaction, self.key, details)
+
+
 class GiveawayClaimModal(discord.ui.Modal):
     """Asks for the prize and the IGN before a giveaway claim ticket opens."""
 
@@ -255,6 +274,9 @@ async def _open_ticket(interaction: discord.Interaction, key: str) -> None:
             "What do you need help with?", view=SupportTypeView(), ephemeral=True
         )
         return
+    if key == "giveaway_sponsor":
+        await interaction.response.send_modal(GiveawaySponsorModal(key))
+        return
     if key == "giveaway_claim":
         await interaction.response.send_modal(GiveawayClaimModal(key))
         return
@@ -340,6 +362,16 @@ async def _create_ticket(interaction: discord.Interaction, key: str, details: di
         # Checks the last giveaways automatically. Confirmed or Under Review, depending on the result.
         win = giveaways.find_recent_win(member.id)
         embed = giveaways.claim_embed(member.id, details["ign"], details["amount"], win)
+    elif key == "giveaway_sponsor":
+        embed = discord.Embed(
+            title="Giveaway Sponsor Ticket",
+            description=(
+                f"**Opened By:** {member.mention}\n\n"
+                f"**Sponsoring:** {details['sponsor']}\n\n"
+                "A staff member will be with you soon."
+            ),
+            color=style.INFO,
+        )
     elif key == "support":
         embed = discord.Embed(
             title="Support Ticket",
