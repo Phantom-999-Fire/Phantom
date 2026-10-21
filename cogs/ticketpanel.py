@@ -21,10 +21,15 @@ DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "ticket_panel.json
 CATEGORIES = [
     {"key": "spawner_sell", "label": "Spawner Sell", "emoji": "💰", "description": "Sell a spawner", "env": "TICKET_CATEGORY_SPAWNER_SELL_ID"},
     {"key": "spawner_buy", "label": "Spawner Buy", "emoji": "🛒", "description": "Buy a spawner", "env": "TICKET_CATEGORY_SPAWNER_BUY_ID"},
-    {"key": "support", "label": "Support", "emoji": "🛠️", "description": "Questions or help with anything", "env": "TICKET_CATEGORY_SUPPORT_ID"},
+    {"key": "support", "label": "Support", "emoji": "🛠️", "description": "Farm support or general help", "env": "TICKET_CATEGORY_SUPPORT_ID"},
     {"key": "mod_purchase", "label": "Mod Purchase", "emoji": "🧩", "description": "Buy a mod", "env": "TICKET_CATEGORY_MOD_PURCHASE_ID"},
+    {"key": "giveaway_sponsor", "label": "Giveaway Sponsor", "emoji": "🏆", "description": "Sponsor a giveaway", "env": "TICKET_CATEGORY_GIVEAWAY_SPONSOR_ID"},
     {"key": "giveaway_claim", "label": "Giveaway Claim", "emoji": "🎁", "description": "Claim a giveaway prize", "env": "TICKET_CATEGORY_GIVEAWAY_CLAIM_ID"},
 ]
+# Order of the menu in the panel (top to bottom).
+PANEL_ORDER = ["support", "spawner_sell", "spawner_buy", "giveaway_sponsor", "giveaway_claim", "mod_purchase"]
+CATEGORIES.sort(key=lambda c: PANEL_ORDER.index(c["key"]))
+
 CATEGORY_BY_KEY = {c["key"]: c for c in CATEGORIES}
 
 # These categories ask the opener for details (what, how many, IGN) before the ticket opens.
