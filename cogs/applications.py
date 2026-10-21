@@ -117,9 +117,13 @@ def _header_embed(application: dict, status: str, color: discord.Color) -> disco
 # ---------- modal and buttons ----------
 
 def _question_label(q: dict) -> str:
-    """The exact question as the form label. Discord allows max. 45 characters, so long ones are cut."""
+    """The question as the form label. Discord allows max. 45 characters, so the label ends at a whole word.
+    The full question is always shown as the placeholder in the field."""
     text = f"{q['n']}. {q['text']}"
-    return text if len(text) <= 45 else text[:44] + "…"
+    if len(text) <= 45:
+        return text
+    cut = text[:45].rsplit(" ", 1)[0]
+    return cut.rstrip(" ,.")
 
 
 class ApplyModal(discord.ui.Modal):
@@ -130,7 +134,7 @@ class ApplyModal(discord.ui.Modal):
         for q in PAGES[page]:
             field = discord.ui.TextInput(
                 label=_question_label(q),
-                placeholder=q["text"][:100],
+                placeholder=q["text"],
                 style=discord.TextStyle.paragraph,
                 max_length=1000,
                 required=True,
