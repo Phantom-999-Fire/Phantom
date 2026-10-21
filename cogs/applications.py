@@ -18,19 +18,19 @@ DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "applications.json
 # "label" is the short field title in the form (max. 45 characters).
 # "text" is the full question, shown to the applicant before each part.
 QUESTIONS = [
-    {"n": 1, "key": "q1", "label": "Your age", "text": "How old are you? (You must be at least 14.)"},
-    {"n": 2, "key": "q2", "label": "How long have you been on our Discord?", "text": "How long have you been a member of our Discord?"},
-    {"n": 3, "key": "q3", "label": "How active are you?", "text": "How many hours per day are you usually active on Discord and on Donut SMP?"},
-    {"n": 4, "key": "q4", "label": "Why do you want to join?", "text": "Why do you want to join the General Support team, and what can you bring to it?"},
-    {"n": 5, "key": "q5", "label": "Previous staff or mod experience", "text": "Have you been a staff member or moderator before? If yes, where and for how long?"},
-    {"n": 6, "key": "q6", "label": "What makes a good staff member?", "text": "In your own words, what makes a good staff member?"},
-    {"n": 7, "key": "q7", "label": "A rude user", "text": "A user is being rude to you in a ticket. What do you do?"},
-    {"n": 8, "key": "q8", "label": "Two users arguing", "text": "Two users are arguing, and each one says the other is wrong. How do you solve it?"},
-    {"n": 9, "key": "q9", "label": "A friend breaks a rule", "text": "A friend of yours breaks a server rule. What do you do?"},
-    {"n": 10, "key": "q10", "label": "Unsure about a rule", "text": "You are not sure whether a rule or punishment applies. What do you do?"},
-    {"n": 11, "key": "q11", "label": "A user asks the same thing again", "text": "A user keeps asking the same question after you already answered it. How do you handle it?"},
-    {"n": 12, "key": "q12", "label": "Staff member is unfair", "text": "Another staff member treats a user unfairly. What do you do?"},
-    {"n": 13, "key": "q13", "label": "Hours per week", "text": "How many hours per week can you regularly give to General Support?"},
+    {"n": 1, "key": "q1", "label": "Age", "text": "How old are you?"},
+    {"n": 2, "key": "q2", "label": "Time in our Discord", "text": "How long have you been in our Discord?"},
+    {"n": 3, "key": "q3", "label": "Activity on Discord & Donut SMP", "text": "How active are you on Discord and Donut SMP?"},
+    {"n": 4, "key": "q4", "label": "Why General Support?", "text": "Why do you want to join the General Support Team?"},
+    {"n": 5, "key": "q5", "label": "Previous Staff/mod experience", "text": "Do you have any previous Staff or moderation experience?"},
+    {"n": 6, "key": "q6", "label": "What makes a good staff member", "text": "What makes a good Staff member?"},
+    {"n": 7, "key": "q7", "label": "Disrespectful user", "text": "How would you handle a user who is being disrespectful towards you?"},
+    {"n": 8, "key": "q8", "label": "Two users arguing", "text": "Two users are arguing, and both claim the other person is at fault. What would you do?"},
+    {"n": 9, "key": "q9", "label": "Friend breaks a rule", "text": "A friend of yours breaks a server rule. How would you handle it?"},
+    {"n": 10, "key": "q10", "label": "Unsure about a rule", "text": "What would you do if you were unsure about a rule or punishment?"},
+    {"n": 11, "key": "q11", "label": "Same question again", "text": "How would you handle a user who keeps asking the same question after you have already answered it?"},
+    {"n": 12, "key": "q12", "label": "Staff treating user unfairly", "text": "What would you do if another Staff member was treating a user unfairly?"},
+    {"n": 13, "key": "q13", "label": "Time you can dedicate", "text": "How much time can you regularly dedicate to General Support?"},
 ]
 # Discord forms hold max. 5 fields, so the questions are split into parts.
 PAGES = [QUESTIONS[0:5], QUESTIONS[5:10], QUESTIONS[10:13]]
@@ -124,6 +124,7 @@ class ApplyModal(discord.ui.Modal):
         for q in PAGES[page]:
             field = discord.ui.TextInput(
                 label=f"{q['n']}. {q['label']}",
+                placeholder=q["text"][:100],
                 style=discord.TextStyle.paragraph,
                 max_length=1000,
                 required=True,
@@ -282,6 +283,30 @@ class ApplicationReviewView(discord.ui.View):
         await _decide(interaction, approve=False)
 
 
+INFO_TEXT = (
+    "Thank you for your interest in joining the team. Please read and answer everything honestly.\n\n"
+    "If your application is successful, we will contact you privately or through a ticket.\n\n"
+    "We are bringing on a limited number of new staff and may keep applications on file for future "
+    "openings. Please do not message staff asking for an update.\n\n"
+    "Staff roles are voluntary and unpaid. By continuing, you agree to these terms. "
+    "Troll applications may result in moderation action. Good luck!"
+)
+
+
+class StartView(discord.ui.View):
+    """Shown after the info text. Starts the questions."""
+
+    def __init__(self) -> None:
+        super().__init__(timeout=900)
+
+    @discord.ui.button(label="Start Application", style=discord.ButtonStyle.success)
+    async def start_application(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        _drafts[interaction.user.id] = {}
+        await interaction.response.send_message(
+            embed=_page_embed(0), view=PageButtonView(0), ephemeral=True
+        )
+
+
 class ApplyPanelView(discord.ui.View):
     """The panel with the Apply button. Persistent, so it works after a restart."""
 
@@ -306,10 +331,12 @@ class ApplyPanelView(discord.ui.View):
             )
             return
 
-        _drafts[member.id] = {}
-        await interaction.response.send_message(
-            embed=_page_embed(0), view=PageButtonView(0), ephemeral=True
+        info = discord.Embed(
+            title="General Support Application: Information",
+            description=INFO_TEXT,
+            color=style.INFO,
         )
+        await interaction.response.send_message(embed=info, view=StartView(), ephemeral=True)
 
 
 # ---------- cog ----------
