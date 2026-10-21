@@ -361,6 +361,40 @@ class Applications(commands.Cog):
         self.bot.add_view(ApplyPanelView())
         self.bot.add_view(ApplicationReviewView())
 
+    @app_commands.command(name="resetapplications", description="Resets all open applications so people can apply again.")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def resetapplications(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        open_applications = [
+            item for item in _load()
+            if item["guild_id"] == interaction.guild_id and item["status"] == "pending"
+        ]
+        for application in open_applications:
+            _update(application["message_id"], status="reset", reset_by=interaction.user.id)
+
+            # Update the review message, so nobody can still accept or deny it.
+            channel = interaction.guild.get_channel(application["channel_id"])
+            if channel is None:
+                continue
+            try:
+                message = await channel.fetch_message(application["message_id"])
+                await message.edit(
+                    embed=_header_embed(application, f"Reset by {interaction.user.mention}", style.INFO),
+                    view=None,
+                )
+            except discord.HTTPException:
+                log.info("Could not update application message %s", application["message_id"])
+
+        drafts = len(_drafts)
+        _drafts.clear()  # applications that people are still filling in
+        await interaction.followup.send(
+            f"Reset {len(open_applications)} open application(s) and {drafts} application(s) in progress.",
+            ephemeral=True,
+        )
+
     @app_commands.command(name="applypanel", description="Posts the staff application panel in this channel.")
     @app_commands.guild_only()
     @app_commands.default_permissions(manage_guild=True)
