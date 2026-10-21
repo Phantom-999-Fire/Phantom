@@ -45,6 +45,10 @@ TICKET_CATEGORY_ID = _env_id("TICKET_CATEGORY_ID")  # Discord category where tic
 SUPPORT_ROLE_ID = _env_id("SUPPORT_ROLE_ID")        # staff role that can see all tickets
 
 
+# Role pinged whenever a ticket opens: the support role, or the staff role if no support role is set.
+STAFF_PING_ROLE_ID = _env_id("SUPPORT_ROLE_ID") or _env_id("STAFF_ROLE_ID")
+
+
 # ---------- storage ----------
 
 def _load() -> list[dict]:
@@ -364,10 +368,12 @@ async def _create_ticket(interaction: discord.Interaction, key: str, details: di
         )
         embed.set_footer(text="A staff member will be with you soon.")
 
+    staff_ping = f" <@&{STAFF_PING_ROLE_ID}>" if STAFF_PING_ROLE_ID else ""
     await channel.send(
-        content=f"{member.mention}, your ticket has been created!",
+        content=f"{member.mention}, your ticket has been created!{staff_ping}",
         embed=embed,
         view=CloseView(),
+        allowed_mentions=discord.AllowedMentions(users=True, roles=True),
     )
     await interaction.followup.send(f"Your ticket is ready: {channel.mention}", ephemeral=True)
 
