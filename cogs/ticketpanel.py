@@ -45,6 +45,9 @@ TICKET_CATEGORY_ID = _env_id("TICKET_CATEGORY_ID")  # Discord category where tic
 SUPPORT_ROLE_ID = _env_id("SUPPORT_ROLE_ID")        # staff role that can see all tickets
 
 
+# Message sent in every giveaway sponsor ticket. Change the names here.
+SPONSOR_PAYMENT_TEXT = "Pay Fire_Azure Or Phantom_999 and send a full screenshot in this ticket."
+
 # Role pinged whenever a ticket opens: the support role, or the staff role if no support role is set.
 STAFF_PING_ROLE_ID = _env_id("SUPPORT_ROLE_ID") or _env_id("STAFF_ROLE_ID")
 
@@ -407,6 +410,12 @@ async def _create_ticket(interaction: discord.Interaction, key: str, details: di
         view=CloseView(),
         allowed_mentions=discord.AllowedMentions(users=True, roles=True),
     )
+
+    if key == "giveaway_sponsor":
+        await channel.send(
+            f"Hey {member.mention} {SPONSOR_PAYMENT_TEXT}",
+            allowed_mentions=discord.AllowedMentions(users=True),
+        )
     await interaction.followup.send(f"Your ticket is ready: {channel.mention}", ephemeral=True)
 
 
