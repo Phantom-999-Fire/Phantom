@@ -18,19 +18,19 @@ DATA_FILE = Path(__file__).resolve().parent.parent / "data" / "applications.json
 # "label" is the short field title in the form (max. 45 characters).
 # "text" is the full question, shown to the applicant before each part.
 QUESTIONS = [
-    {"n": 1, "key": "q1", "label": "Age", "text": "How old are you?"},
-    {"n": 2, "key": "q2", "label": "Time in our Discord", "text": "How long have you been in our Discord?"},
-    {"n": 3, "key": "q3", "label": "Activity on Discord & Donut SMP", "text": "How active are you on Discord and Donut SMP?"},
-    {"n": 4, "key": "q4", "label": "Why General Support?", "text": "Why do you want to join the General Support Team?"},
-    {"n": 5, "key": "q5", "label": "Previous Staff/mod experience", "text": "Do you have any previous Staff or moderation experience?"},
-    {"n": 6, "key": "q6", "label": "What makes a good staff member", "text": "What makes a good Staff member?"},
-    {"n": 7, "key": "q7", "label": "Disrespectful user", "text": "How would you handle a user who is being disrespectful towards you?"},
-    {"n": 8, "key": "q8", "label": "Two users arguing", "text": "Two users are arguing, and both claim the other person is at fault. What would you do?"},
-    {"n": 9, "key": "q9", "label": "Friend breaks a rule", "text": "A friend of yours breaks a server rule. How would you handle it?"},
-    {"n": 10, "key": "q10", "label": "Unsure about a rule", "text": "What would you do if you were unsure about a rule or punishment?"},
-    {"n": 11, "key": "q11", "label": "Same question again", "text": "How would you handle a user who keeps asking the same question after you have already answered it?"},
-    {"n": 12, "key": "q12", "label": "Staff treating user unfairly", "text": "What would you do if another Staff member was treating a user unfairly?"},
-    {"n": 13, "key": "q13", "label": "Time you can dedicate", "text": "How much time can you regularly dedicate to General Support?"},
+    {"n": 1, "key": "q1", "label": "How old are you?", "text": "How old are you?"},
+    {"n": 2, "key": "q2", "label": "How long have you been in our Discord?", "text": "How long have you been in our Discord?"},
+    {"n": 3, "key": "q3", "label": "How active are you on Discord and Donut SMP?", "text": "How active are you on Discord and Donut SMP?"},
+    {"n": 4, "key": "q4", "label": "Why do you want to join General Support?", "text": "Why do you want to join the General Support Team?"},
+    {"n": 5, "key": "q5", "label": "Do you have previous staff or mod experience?", "text": "Do you have any previous Staff or moderation experience?"},
+    {"n": 6, "key": "q6", "label": "What makes a good staff member?", "text": "What makes a good Staff member?"},
+    {"n": 7, "key": "q7", "label": "How would you handle a disrespectful user?", "text": "How would you handle a user who is being disrespectful towards you?"},
+    {"n": 8, "key": "q8", "label": "How would you settle a fight between users?", "text": "Two users are arguing, and both claim the other person is at fault. What would you do?"},
+    {"n": 9, "key": "q9", "label": "What would you do if a friend breaks a rule?", "text": "A friend of yours breaks a server rule. How would you handle it?"},
+    {"n": 10, "key": "q10", "label": "What do you do if unsure about a rule?", "text": "What would you do if you were unsure about a rule or punishment?"},
+    {"n": 11, "key": "q11", "label": "How do you handle repeated questions?", "text": "How would you handle a user who keeps asking the same question after you have already answered it?"},
+    {"n": 12, "key": "q12", "label": "What do you do if a staff member is unfair?", "text": "What would you do if another Staff member was treating a user unfairly?"},
+    {"n": 13, "key": "q13", "label": "How many hours per week can you give?", "text": "How much time can you regularly dedicate to General Support?"},
 ]
 # Discord forms hold max. 5 fields, so the questions are split into parts.
 PAGES = [QUESTIONS[0:5], QUESTIONS[5:10], QUESTIONS[10:13]]
@@ -123,7 +123,7 @@ class ApplyModal(discord.ui.Modal):
         self.fields: list[tuple[str, discord.ui.TextInput]] = []
         for q in PAGES[page]:
             field = discord.ui.TextInput(
-                label=f"{q['n']}. {q['label']}",
+                label=q["label"],
                 placeholder=q["text"],
                 style=discord.TextStyle.paragraph,
                 max_length=1000,
