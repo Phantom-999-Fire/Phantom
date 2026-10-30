@@ -8,6 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from cogs import _style as style
+from cogs import _logs as logs
 
 log = logging.getLogger("bot.banreq")
 
@@ -108,6 +109,9 @@ async def _decide(interaction: discord.Interaction, approve: bool) -> None:
 
     if not approve:
         _update(interaction.message.id, status="denied", decided_by=decider.id)
+        await logs.log_mod_action(
+            guild, "Ban request denied", decider, target_id=request["target_id"], reason=request["reason"]
+        )
         embed = _review_embed(request, f"Denied by {decider.mention}", style.ERROR)
         await interaction.edit_original_response(embed=embed, view=None)
         return
@@ -138,6 +142,9 @@ async def _decide(interaction: discord.Interaction, approve: bool) -> None:
         return
 
     _update(interaction.message.id, status="approved", decided_by=decider.id)
+    await logs.log_mod_action(
+        guild, "Ban request approved", decider, target_id=target_id, reason=request["reason"]
+    )
     embed = _review_embed(request, f"Approved by {decider.mention}", style.SUCCESS)
     await interaction.edit_original_response(embed=embed, view=None)
 
@@ -235,6 +242,9 @@ class BanRequests(commands.Cog):
         )
         request["message_id"] = message.id
         _add(request)
+        await logs.log_mod_action(
+            guild, "Ban requested", requester, target_id=user.id, reason=reason
+        )
 
         await interaction.response.send_message(
             f"Your ban request for {user.mention} was sent to {channel.mention}.", ephemeral=True

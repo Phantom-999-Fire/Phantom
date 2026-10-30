@@ -11,6 +11,7 @@ from discord import app_commands
 from discord.ext import commands
 from cogs import _style as style
 from cogs import _giveaway_store as giveaways
+from cogs import _logs as logs
 
 log = logging.getLogger("bot.ticketpanel")
 
@@ -133,6 +134,7 @@ class CloseView(discord.ui.View):
             return
 
         await interaction.response.send_message("Closing this ticket in 5 seconds…")
+        await logs.save_transcript(interaction.channel, interaction.user)
         _remove(interaction.channel_id)
         await asyncio.sleep(5)
         try:
@@ -470,6 +472,7 @@ class CloseRequestView(discord.ui.View):
             embed=None,
             view=None,
         )
+        await logs.save_transcript(interaction.channel, interaction.user)
         _remove(interaction.channel_id)
         await asyncio.sleep(5)
         try:
@@ -690,6 +693,7 @@ class TicketPanel(commands.Cog):
             return
 
         await interaction.response.send_message("Closing this ticket in 5 seconds…")
+        await logs.save_transcript(interaction.channel, interaction.user)
         _remove(interaction.channel_id)
         await asyncio.sleep(5)
         try:

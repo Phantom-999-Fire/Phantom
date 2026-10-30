@@ -4,6 +4,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from cogs import _style as style
+from cogs import _logs as logs
 
 log = logging.getLogger("bot.bans")
 
@@ -72,6 +73,7 @@ class Bans(commands.Cog):
             await interaction.response.send_message("The ban failed. Please try again.", ephemeral=True)
             return
 
+        await logs.log_mod_action(guild, "Ban", moderator, target_id=user.id, reason=reason)
         await interaction.response.send_message(
             f"Banned {user.mention} (`{user}`). Reason: {reason}"
         )
@@ -111,6 +113,9 @@ class Bans(commands.Cog):
             )
             return
 
+        await logs.log_mod_action(
+            interaction.guild, "Unban", interaction.user, target_id=user.id, reason=reason
+        )
         await interaction.response.send_message(f"Unbanned `{user}`. Reason: {reason}")
 
 
